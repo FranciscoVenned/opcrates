@@ -1,0 +1,27 @@
+lore-preview:
+  - "&7This is a reward item"
+  - "&dChance: {chance}%"
+  - "&aStutus: {status}"
+  - "&eClick Change Status!"
+
+summary-text:
+  - "&7Summary of &a{player}'s"
+  - "{rewards}"
+  - " "
+  - "&7Join Server "
+
+duration-crate-opening: 10 #seconds
+duration-lootbox-opening: 10 #seconds
+
+
+messages:
+  opening-lootbox: "&cOpening lootbox {lootbox}"
+  no_key_crate: "&c&l(!) &cYou don't have the key {crate}"
+  create_crate_name: "&c&l(!) &7Specify the name and displayName"
+  already_exist_crate: "&c&l(!) &cAlready exist crate"
+  crate_success: "&c&L(!) Crate {name} crated!"
+  no_crate_name_key: "&c&l(!) &cSpecify the name of the Crate"
+  crate_no_exist: "&c&l(!) &cThere is no such Crate"
+  crate_reward_no_hand: "&c&l(!) &cHave an item in your hand"
+  crate_set_key: "&c&l(!) &cCrate Set Key Success {crate}"
+  crate_win_item: "&aYou won: {item_reward}"
