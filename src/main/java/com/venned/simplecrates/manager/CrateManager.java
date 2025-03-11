@@ -3,21 +3,17 @@ package com.venned.simplecrates.manager;
 import com.venned.simplecrates.Main;
 import com.venned.simplecrates.build.Crate;
 import com.venned.simplecrates.build.ItemReward;
-import com.venned.simplecrates.build.LootBox;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.util.io.BukkitObjectInputStream;
-import org.bukkit.util.io.BukkitObjectOutputStream;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class CrateManager {
 
@@ -63,10 +59,20 @@ public class CrateManager {
 
             List<String> hologramText = section.getStringList(key + ".textHologram");
 
+            List<String> announce = section.getStringList(key + ".announce");
+
+            boolean announceStatus = section.getBoolean(key + ".announce_status");
+
+            List<String> announceStart = section.getStringList(key + ".announce_start");
+
             String materialName = section.getString(key + ".key.material");
             Material material = Material.matchMaterial(materialName);
             String keyName = section.getString(key + ".key.name");
             List<String> keyLore = section.getStringList(key + ".key.lore");
+            keyLore = keyLore.stream().map(lore2 -> lore2.replace("&", "§")).collect(Collectors.toList());
+
+            String title = section.getString(key + ".titlePreview");
+
             ItemStack itemKey = new ItemStack(material);
             ItemMeta meta = itemKey.getItemMeta();
             if (meta != null) {
@@ -83,7 +89,8 @@ public class CrateManager {
                 double chance = (double) rewardMap.get("chance");
 
                 List<String> commands = (List<String>) rewardMap.get("commands");
-                ItemStack itemStack = (ItemStack) deserializeItemStack((String) rewardMap.get("item"));
+                ItemStack itemStack = deserializeItemStack((Map<String, Object>) rewardMap.get("item"));
+
 
                 boolean visible = (boolean) rewardMap.get("visible");
 
@@ -98,7 +105,7 @@ public class CrateManager {
                 rewards.add(new ItemReward(rewardName, itemStack, chance, commands, visible, playerDisabled));
             }
 
-            crates.add(new Crate(name, rewards, displayName, max_reward, lore, hologramText, itemKey));
+            crates.add(new Crate(name, rewards, displayName, max_reward, lore, hologramText, itemKey, announce, title, announceStart, announceStatus));
         }
     }
 
@@ -108,6 +115,9 @@ public class CrateManager {
         for (Crate crates : crates) {
             String path = "crates." + crates.getName();
             cratesConfig.set(path + ".name", crates.getName());
+            cratesConfig.set(path + ".announce_status", crates.isAnnounceStatus());
+            cratesConfig.set(path + ".announce", crates.getAnnouncementFinish());
+            cratesConfig.set(path + ".announce_start", crates.getAnnouncementStart());
             cratesConfig.set(path + ".display_name", crates.getDisplayName());
             cratesConfig.set(path + ".max_reward", crates.getMax_reward());
             cratesConfig.set(path + ".lore", crates.getLoreS());
@@ -115,8 +125,7 @@ public class CrateManager {
             cratesConfig.set(path + ".key.material", crates.getItemKey().getType().name());
             cratesConfig.set(path + ".key.name", crates.getItemKey().getItemMeta().getDisplayName());
             cratesConfig.set(path + ".key.lore", crates.getItemKey().getItemMeta().hasLore() ? crates.getItemKey().getItemMeta().getLore() : new ArrayList<>());
-
-
+            cratesConfig.set(path + ".titlePreview", crates.getPreviewTitle());
 
             List<Map<String, Object>> rewardList = new ArrayList<>();
             for (ItemReward reward : crates.getRewards()) {
@@ -124,6 +133,7 @@ public class CrateManager {
                 rewardMap.put("name", reward.getName());
                 rewardMap.put("chance", reward.getChance());
                 rewardMap.put("item", serializeItemStack(reward.getItemStack()));
+
                 rewardMap.put("commands", reward.getCommands());
                 rewardMap.put("visible", reward.isVisible());
 
@@ -170,32 +180,56 @@ public class CrateManager {
         return crates.stream().filter(c->c.getName().equalsIgnoreCase(name)).findFirst().orElse(null);
     }
 
-    private String serializeItemStack(ItemStack item) {
+    private Map<String, Object> serializeItemStack(ItemStack item) {
         if (item == null) return null;
-        try {
-            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-            BukkitObjectOutputStream bukkitObjectOutputStream = new BukkitObjectOutputStream(byteArrayOutputStream);
-            bukkitObjectOutputStream.writeObject(item);
-            bukkitObjectOutputStream.close();
-            return Base64.getEncoder().encodeToString(byteArrayOutputStream.toByteArray());
-        } catch (IOException e) {
-            e.printStackTrace();
-            return null;
+
+        Map<String, Object> data = new HashMap<>(item.serialize()); // Convertir a HashMap para modificar
+
+        if (item.hasItemMeta()) {
+            ItemMeta meta = item.getItemMeta();
+            Map<String, Object> metaData = new HashMap<>(meta.serialize()); // Convertir a HashMap para modificar
+
+            if (meta.hasDisplayName()) {
+                metaData.put("display-name", meta.getDisplayName().replace("§", "&"));
+            }
+
+            if (meta.hasLore()) {
+                List<String> formattedLore = meta.getLore().stream()
+                        .map(lore -> lore.replace("§", "&"))
+                        .collect(Collectors.toList());
+                metaData.put("lore", formattedLore);
+            }
+
+            data.put("meta", metaData); // Reemplazar los metadatos en la estructura original
         }
+
+        return data;
     }
 
-    private ItemStack deserializeItemStack(String data) {
-        if (data == null || data.isEmpty()) return null;
-        try {
-            byte[] decodedBytes = Base64.getDecoder().decode(data);
-            ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(decodedBytes);
-            BukkitObjectInputStream bukkitObjectInputStream = new BukkitObjectInputStream(byteArrayInputStream);
-            ItemStack item = (ItemStack) bukkitObjectInputStream.readObject();
-            bukkitObjectInputStream.close();
-            return item;
-        } catch (IOException | ClassNotFoundException e) {
-            e.printStackTrace();
-            return null;
+
+    private ItemStack deserializeItemStack(Map<String, Object> data) {
+        if (data == null) return null;
+
+        ItemStack item = ItemStack.deserialize(data);
+
+        if (data.containsKey("meta")) {
+            Map<String, Object> metaData = (Map<String, Object>) data.get("meta");
+            ItemMeta meta = item.getItemMeta();
+
+            if (metaData.containsKey("display-name")) {
+                meta.setDisplayName(((String) metaData.get("display-name")).replace("&", "§"));
+            }
+
+            if (metaData.containsKey("lore")) {
+                List<String> formattedLore = ((List<String>) metaData.get("lore")).stream()
+                        .map(lore -> lore.replace("&", "§"))
+                        .collect(Collectors.toList());
+                meta.setLore(formattedLore);
+            }
+
+            item.setItemMeta(meta);
         }
+
+        return item;
     }
 }

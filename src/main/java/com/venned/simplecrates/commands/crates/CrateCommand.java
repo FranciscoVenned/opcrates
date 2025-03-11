@@ -5,14 +5,13 @@ import com.venned.simplecrates.build.Crate;
 import com.venned.simplecrates.build.CrateBlock;
 import com.venned.simplecrates.build.ItemReward;
 import com.venned.simplecrates.build.LootBox;
+import com.venned.simplecrates.build.player.PlayerData;
 import com.venned.simplecrates.gui.edit.EditChances;
 import com.venned.simplecrates.manager.CrateBlockManager;
 import com.venned.simplecrates.manager.CrateManager;
+import com.venned.simplecrates.manager.player.PlayerManager;
 import com.venned.simplecrates.utils.NameSpaceUtils;
-import org.bukkit.ChatColor;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.Sound;
+import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -33,11 +32,13 @@ public class CrateCommand implements CommandExecutor {
     CrateManager manager;
     CrateBlockManager crateBlockManager;
     EditChances editChances;
+    PlayerManager playerManager;
 
-    public CrateCommand(CrateManager manager, EditChances editChances, CrateBlockManager crateBlockManager) {
+    public CrateCommand(CrateManager manager, EditChances editChances, CrateBlockManager crateBlockManager, PlayerManager playerManager) {
         this.manager = manager;
         this.editChances = editChances;
         this.crateBlockManager = crateBlockManager;
+        this.playerManager = playerManager;
     }
 
 
@@ -55,6 +56,7 @@ public class CrateCommand implements CommandExecutor {
                         "&c- &7givekey <name> -> You will get a key in your inventory",
                         "&c- &7setkey <name> -> You set key in your item main hand",
                         "&c- &7edit <name> -> You can edit the lootbox",
+                        "&c- &7keyall <name> <amount> -> Key All Players",
                         " ");
 
                 for(String i : info){
@@ -66,6 +68,26 @@ public class CrateCommand implements CommandExecutor {
             }
 
             switch (args[0]) {
+
+                case "notify" -> {
+                    PlayerData playerData = playerManager.getPlayerDatas().stream()
+                            .filter(c->c.getUUID().equals(player.getUniqueId()))
+                            .findFirst().orElse(null);
+                    if(playerData != null){
+
+                        boolean status = playerData.isNotifiedReward();
+
+                        if(status){
+                            player.sendMessage("Status Notify Disabled");
+                            playerData.setNotifiedReward(false);
+                        } else {
+                            player.sendMessage("Status Notify Enabled");
+                            playerData.setNotifiedReward(true);
+                        }
+
+                        return true;
+                    }
+                }
 
                 case "create" -> {
                     if(args.length < 3) {
@@ -142,9 +164,6 @@ public class CrateCommand implements CommandExecutor {
                         player.sendMessage("§c§l(!) §cYou must be looking at a solid block!");
                         return true;
                     }
-
-
-                    player.sendMessage(targetBlock.getType().toString());
 
                     Location location = targetBlock.getLocation();
 
@@ -239,9 +258,9 @@ public class CrateCommand implements CommandExecutor {
                     break;
                 }
 
-                case "givekey" -> {
-                    if(args.length < 2) {
-                        player.sendMessage("§c§l(!) §cSpecify the name");
+                case "keyall" -> {
+                    if(args.length < 3) {
+                        player.sendMessage("§c§l(!) §cSpecify the name and amount");
                         return true;
                     }
                     String name = args[1];
@@ -251,8 +270,55 @@ public class CrateCommand implements CommandExecutor {
                         player.sendMessage("§c§l(!) §cThere is no such Crate");
                         return true;
                     }
-                    player.getInventory().addItem(lootBox.getItemKey());
-                    player.sendMessage("§c§l(!) §dCrate Key " + name + " item was given to you");
+
+                    int amount;
+
+                    try {
+                        amount = Integer.parseInt(args[2]);
+                    } catch (NumberFormatException e) {
+                        return true;
+                    }
+
+                    ItemStack itemStack = lootBox.getItemKey().clone();
+                    itemStack.setAmount(amount);
+
+                    for(Player players : Bukkit.getOnlinePlayers()){
+                        players.getInventory().addItem(itemStack);
+                    }
+                    break;
+                }
+
+                case "givekey" -> {
+                    if(args.length < 4) {
+                        player.sendMessage("§c§l(!) §cCorrect Usage  /crate givekey {crate} {player} {amount}");
+                        return true;
+                    }
+                    String name = args[1];
+                    Crate lootBox = manager.getCrates().stream()
+                            .filter(n->n.getName().equalsIgnoreCase(name)).findFirst().orElse(null);
+                    if(lootBox == null) {
+                        player.sendMessage("§c§l(!) §cThere is no such Crate");
+                        return true;
+                    }
+
+                    Player playerFind = Bukkit.getPlayer(args[2]);
+                    if(playerFind == null) {
+                        player.sendMessage("§c§l(!) §cPlayer not found");
+                        return true;
+                    }
+
+                    int amount;
+                    try {
+                        amount = Integer.parseInt(args[3]);
+                    } catch (NumberFormatException e) {
+                        player.sendMessage("§c§l(!) §cAmount no correct");
+                        return true;
+                    }
+
+                    ItemStack itemStack = lootBox.getItemKey().clone();
+                    itemStack.setAmount(amount);
+                    playerFind.getInventory().addItem(itemStack);
+                    playerFind.sendMessage("§c§l(!) §dCrate Key " + name + " item was given to you");
                     break;
                 }
             }

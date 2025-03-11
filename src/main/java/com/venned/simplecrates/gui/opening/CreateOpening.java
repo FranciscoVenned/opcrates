@@ -3,7 +3,11 @@ package com.venned.simplecrates.gui.opening;
 import com.venned.simplecrates.Main;
 import com.venned.simplecrates.build.Crate;
 import com.venned.simplecrates.build.ItemReward;
-import com.venned.simplecrates.listeners.PlayerCrateListener;
+import com.venned.simplecrates.build.player.PlayerData;
+import com.venned.simplecrates.build.player.PlayerOpening;
+import com.venned.simplecrates.listeners.crate.PlayerCrateListener;
+import com.venned.simplecrates.manager.player.PlayerManager;
+import com.venned.simplecrates.utils.MapUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -12,6 +16,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +35,9 @@ public class CreateOpening {
         Inventory inventory = Bukkit.createInventory(null, 27, ChatColor.translateAlternateColorCodes('&', "&6Opening " + crate.getName()));
         player.openInventory(inventory);
 
+        MapUtils.playerOpenings.removeIf(p->p.getUUID().equals(player.getUniqueId()));
+
+
         List<ItemReward> rewardsG = crate.getRewards();
         List<ItemReward> rewards = new ArrayList<>();
         for(ItemReward r : rewardsG){
@@ -38,13 +46,18 @@ public class CreateOpening {
             }
         }
 
+        PlayerOpening playerOpening = new PlayerOpening(player.getUniqueId(), crate, rewards);
+        playerOpening.setRoundLeft(crate.getMax_reward());
+        MapUtils.playerOpenings.add(playerOpening);
+
         int duration = Main.getInstance().getConfig().getInt("duration-crate-opening");
 
+        List<ItemReward> rewardsWin = new ArrayList<>();
 
         double totalWeight = rewards.stream().mapToDouble(ItemReward::getChance).sum();
         Random random = new Random();
 
-        new BukkitRunnable() {
+        BukkitTask task =  new BukkitRunnable() {
             int spinsLeft = duration * 20;  // Siempre 10 giros por cada recompensa
             int roundsLeft = crate.getMax_reward(); // Veces que se repite el proceso
 
@@ -58,7 +71,7 @@ public class CreateOpening {
                 }
 
                 if (spinsLeft <= 0) {
-                    // Dar la recompensa actual (item en la posición central)
+
                     ItemStack wonItem = inventory.getItem(13);
                     ItemReward itemReward = rewards.stream()
                             .filter(p->p.getItemStack().isSimilar(wonItem))
@@ -74,7 +87,9 @@ public class CreateOpening {
                         }
 
                         player.getInventory().addItem(wonItem);
-                        player.sendMessage(Main.getMessage("crate_win_item", Map.of("{item_reward}", itemReward.getName())));
+                        player.sendMessage(Main.getMessage("crate_win_item", Map.of("item_reward", itemReward.getName())));
+                        rewardsWin.add(itemReward);
+                        playerOpening.getRewardsAlready().add(itemReward);
 
                         if (!itemReward.getCommands().isEmpty()) {
                             for (String command : itemReward.getCommands()) {
@@ -85,11 +100,43 @@ public class CreateOpening {
                     }
 
                     roundsLeft--;
+                    playerOpening.setRoundLeft(roundsLeft);
 
                     if (roundsLeft <= 0) {
                         PlayerCrateListener.opening.remove(player);
+                        MapUtils.playerOpenings.removeIf(p->p.getUUID().equals(player.getUniqueId()));
                         player.closeInventory();
                         cancel();
+
+
+                        List<String> announce = crate.getAnnouncementFinish();
+                        if (!announce.isEmpty()) {
+                            List<String> finalMessage = new ArrayList<>();
+                            for (String line : announce) {
+                                if (line.contains("{reward}")) {
+                                    for (ItemReward reward : rewardsWin) {
+                                        finalMessage.add(line.replace("{reward}", reward.getName()));
+                                    }
+                                } else {
+                                    finalMessage.add(line);
+                                }
+                            }
+
+                            PlayerManager playerManager = Main.getInstance().getPlayerManager();
+
+                            if(crate.isAnnounceStatus()) {
+                                for (Player players : Bukkit.getOnlinePlayers()) {
+                                    PlayerData playerData = playerManager.getPlayerData(players);
+                                    if (playerData.isNotifiedReward()) {
+                                        for (String line : finalMessage) {
+                                            line = line.replace("{player}", player.getName()).replace("{crate}", crate.getName());
+                                            player.sendMessage(ChatColor.translateAlternateColorCodes('&', line));
+                                        }
+                                    }
+                                }
+                            }
+
+                        }
                         return;
                     }
                     spinsLeft = duration * 20;
@@ -111,6 +158,8 @@ public class CreateOpening {
                 spinsLeft--; // Reducir cantidad de giros restantes en esta ronda
             }
         }.runTaskTimer(Main.getInstance(), 0L, 2L);
+
+        playerOpening.setTask(task);
     }
 
     private static ItemStack getWeightedRandomItem(List<ItemReward> rewards, double totalWeight, Random random) {

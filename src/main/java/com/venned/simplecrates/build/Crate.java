@@ -1,8 +1,12 @@
 package com.venned.simplecrates.build;
 
+import com.venned.simplecrates.Main;
+import com.venned.simplecrates.build.player.PlayerData;
 import com.venned.simplecrates.gui.opening.CreateOpening;
 import com.venned.simplecrates.interfaces.Opening;
+import com.venned.simplecrates.manager.player.PlayerManager;
 import com.venned.simplecrates.utils.NameSpaceUtils;
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -15,6 +19,7 @@ import java.util.*;
 public class Crate implements Opening {
 
     String name;
+    String previewTitle;
     String displayName;
     List<ItemReward> rewards;
     ItemStack item;
@@ -22,15 +27,18 @@ public class Crate implements Opening {
     List<String> loreS;
     List<String> hologramText;
     ItemStack itemKey;
+    List<String> announcementFinish;
+    List<String> announcementStart;
+    boolean announce;
 
-    public Crate(String name, List<ItemReward> rewards, String displayName, int max_reward, List<String> lore, List<String> hologramText, ItemStack itemKeyG) {
+    public Crate(String name, List<ItemReward> rewards, String displayName, int max_reward, List<String> lore, List<String> hologramText, ItemStack itemKeyG, List<String> announcement, String previewTitle, List<String> announcementStart, boolean announce) {
         this.name = name;
         this.rewards = rewards;
         this.displayName = displayName;
         this.max_reward = max_reward;
         this.loreS = lore;
         this.hologramText = hologramText;
-
+        this.previewTitle = previewTitle;
         ItemStack itemStack = new ItemStack(Material.CHEST);
         ItemMeta itemMeta = itemStack.getItemMeta();
 
@@ -55,6 +63,10 @@ public class Crate implements Opening {
         itemMeta.getPersistentDataContainer().set(NameSpaceUtils.crate, PersistentDataType.STRING, name);
         itemStack.setItemMeta(itemMeta);
         this.item = itemStack;
+        this.announcementFinish = announcement;
+        this.announcementStart = announcementStart;
+        this.announce = announce;
+
     }
 
     public Crate(String name, List<ItemReward> rewards, String displayName) {
@@ -65,6 +77,7 @@ public class Crate implements Opening {
 
         ItemStack itemKey = new ItemStack(Material.PAPER);
         ItemMeta itemMetaKey = itemKey.getItemMeta();
+
         itemMetaKey.setDisplayName(ChatColor.translateAlternateColorCodes('&', displayName) + " Key");
         itemKey.setItemMeta(itemMetaKey);
 
@@ -82,15 +95,38 @@ public class Crate implements Opening {
         }
         itemMeta.setLore(loreA);
 
+        this.previewTitle = "Preview " + getDisplayName();
         this.loreS = loreTest;
         this.hologramText = loreTest;
         itemMeta.setDisplayName(ChatColor.translateAlternateColorCodes('&', displayName));
         itemMeta.getPersistentDataContainer().set(NameSpaceUtils.crate, PersistentDataType.STRING, name);
         itemStack.setItemMeta(itemMeta);
         this.item = itemStack;
+        List<String> announce = new ArrayList<>();
+        announce.add("&dRewards Crate " + this.getDisplayName());
+        announce.add("{reward}");
+        this.announcementFinish = announce;
+
+        List<String> announceStart = new ArrayList<>();
+        announceStart.add("&dOpening Crate " + this.getDisplayName());
+        announceStart.add("{player}");
+
+        this.announcementStart = announceStart;
+        this.announce = true;
     }
 
     public void openCrate(Player player){
+        if(isAnnounceStatus()) {
+            PlayerManager playerManager = Main.getInstance().getPlayerManager();
+            for (Player players : Bukkit.getOnlinePlayers()) {
+                PlayerData playerData = playerManager.getPlayerData(players);
+                if (playerData.isNotifiedReward()) {
+                    for (String a : getAnnouncementStart()) {
+                        players.sendMessage(a.replace("{player}", player.getName()).replace("{crate}", getName()));
+                    }
+                }
+            }
+        }
         CreateOpening.open(player, this);
     }
 
@@ -131,6 +167,14 @@ public class Crate implements Opening {
         return false;
     }
 
+    public boolean isAnnounceStatus() {
+        return announce;
+    }
+
+    public String getPreviewTitle() {
+        return previewTitle;
+    }
+
     public void setItemKey(ItemStack itemKey) {
         this.itemKey = itemKey;
     }
@@ -161,6 +205,14 @@ public class Crate implements Opening {
 
     public String getName() {
         return name;
+    }
+
+    public List<String> getAnnouncementFinish() {
+        return announcementFinish;
+    }
+
+    public List<String> getAnnouncementStart() {
+        return announcementStart;
     }
 
     public List<ItemReward> getRewards() {

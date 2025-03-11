@@ -32,9 +32,9 @@ public class PreviewRewards implements Listener {
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
     }
 
-    public void onPreview(Player player, List<ItemReward> rewards) {
+    public void onPreview(Player player, List<ItemReward> rewards, String title) {
 
-        Inventory inventory = Bukkit.createInventory(null, 54, "Preview Rewards");
+        Inventory inventory = Bukkit.createInventory(null, 54, title);
 
         FileConfiguration config = Main.getInstance().getConfig();
 
@@ -47,7 +47,8 @@ public class PreviewRewards implements Listener {
         for(int i = 0; i < visibleRewards.size(); i++){
             ItemReward itemReward = visibleRewards.get(i);
 
-            ItemStack itemStack = itemReward.getItemStack().clone();ItemMeta itemMeta = itemStack.getItemMeta();
+            ItemStack itemStack = itemReward.getItemStack().clone();
+            ItemMeta itemMeta = itemStack.getItemMeta();
 
             List<String> lore = new ArrayList<>(config.getStringList("lore-preview"));
 
@@ -89,6 +90,8 @@ public class PreviewRewards implements Listener {
                     AttributeModifier.Operation.ADD_NUMBER
             ));
 
+            itemMeta.setDisplayName(itemReward.getName().replace("&", "§"));
+
                 itemStack.setItemMeta(itemMeta);
                 inventory.setItem(i, itemStack);
 
@@ -98,7 +101,7 @@ public class PreviewRewards implements Listener {
         player.openInventory(inventory);
 
         previewMenu.removeIf(p->p.getUUID().equals(player.getUniqueId()));
-        previewMenu.add(new PlayerPreview(inventory, rewards, player.getUniqueId()));
+        previewMenu.add(new PlayerPreview(inventory, rewards, player.getUniqueId(), title));
 
     }
 
@@ -108,9 +111,7 @@ public class PreviewRewards implements Listener {
 
         PlayerPreview previewRewards = previewMenu.stream().filter(c->c.getUUID().equals(event.getWhoClicked().getUniqueId())).findFirst().orElse(null);
         if(previewRewards == null) return;
-        if(previewRewards.getInventory().equals(event.getClickedInventory())){
             event.setCancelled(true);
-
             ItemStack item = event.getCurrentItem();
             if(item == null) return;
             if(item.getItemMeta() != null){
@@ -124,18 +125,18 @@ public class PreviewRewards implements Listener {
                                 itemReward.getDisabledPlayers().add(event.getWhoClicked().getUniqueId());
                             }
                             Player player = (Player) event.getWhoClicked();
-                            onPreview(player, previewRewards.getRewardList());
+                            onPreview(player, previewRewards.getRewardList(), previewRewards.getTitle());
                         }
                     }
                 }
             }
 
-        }
+
     }
 
     @EventHandler
     public void onClose(InventoryCloseEvent event){
-        previewMenu.remove((Player) event.getPlayer());
+        previewMenu.removeIf(p->p.getUUID().equals(event.getPlayer().getUniqueId()));
     }
 
 

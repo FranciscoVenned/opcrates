@@ -11,11 +11,17 @@ public class PlayerPreview {
     Inventory inventory;
     List<ItemReward> rewardList;
     UUID uuid;
+    String title;
 
-    public PlayerPreview(Inventory inventory, List<ItemReward> rewardList, UUID uuid) {
+    public PlayerPreview(Inventory inventory, List<ItemReward> rewardList, UUID uuid, String title) {
         this.inventory = inventory;
         this.rewardList = rewardList;
         this.uuid = uuid;
+        this.title = title;
+    }
+
+    public String getTitle() {
+        return title;
     }
 
     public UUID getUUID() {

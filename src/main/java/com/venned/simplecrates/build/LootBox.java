@@ -25,13 +25,18 @@ public class LootBox implements Opening {
     ItemStack item;
     int max_reward;
     List<String> loreS;
+    String titlePreview;
+    List<String> announcementFinish;
+    List<String> announcementStart;
+    boolean announce;
 
-    public LootBox(String name, List<ItemReward> rewards, String displayName, int max_reward, List<String> lore) {
+    public LootBox(String name, List<ItemReward> rewards, String displayName, int max_reward, List<String> lore, String titlePreview, List<String> announcementFinish, List<String> announcementStart, boolean announce) {
         this.name = name;
         this.rewards = rewards;
         this.displayName = displayName;
         this.max_reward = max_reward;
         this.loreS = lore;
+        this.titlePreview = titlePreview;
 
         ItemStack itemStack = new ItemStack(Material.SHULKER_BOX);
         ItemMeta itemMeta = itemStack.getItemMeta();
@@ -47,6 +52,9 @@ public class LootBox implements Opening {
         itemMeta.getPersistentDataContainer().set(NameSpaceUtils.lootBox, PersistentDataType.STRING, name);
         itemStack.setItemMeta(itemMeta);
         this.item = itemStack;
+        this.announcementStart = announcementStart;
+        this.announce = announce;
+        this.announcementFinish = announcementFinish;
     }
 
     public LootBox(String name, List<ItemReward> rewards, String displayName) {
@@ -67,11 +75,24 @@ public class LootBox implements Opening {
         itemMeta.setLore(loreA);
 
         this.loreS = loreTest;
+        this.titlePreview = "Preview " + getDisplayName();
 
         itemMeta.setDisplayName(ChatColor.translateAlternateColorCodes('&', displayName));
         itemMeta.getPersistentDataContainer().set(NameSpaceUtils.lootBox, PersistentDataType.STRING, name);
         itemStack.setItemMeta(itemMeta);
         this.item = itemStack;
+
+        List<String> announce = new ArrayList<>();
+        announce.add("&dRewards Crate " + this.getDisplayName());
+        announce.add("{reward}");
+        this.announcementFinish = announce;
+
+        List<String> announceStart = new ArrayList<>();
+        announce.add("&dOpening Crate " + this.getDisplayName());
+        announce.add("{player}");
+
+        this.announcementStart = announceStart;
+        this.announce = true;
     }
 
     public void open(Player player) {
@@ -137,8 +158,24 @@ public class LootBox implements Opening {
         return false;
     }
 
+    public List<String> getAnnouncementStart() {
+        return announcementStart;
+    }
+
+    public List<String> getAnnouncementFinish() {
+        return announcementFinish;
+    }
+
+    public boolean isAnnounceStatus() {
+        return announce;
+    }
+
     public List<String> getLoreS() {
         return loreS;
+    }
+
+    public String getTitlePreview() {
+        return titlePreview;
     }
 
     public int getMax_reward() {

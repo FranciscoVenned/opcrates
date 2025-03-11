@@ -7,11 +7,13 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.util.io.BukkitObjectInputStream;
 import org.bukkit.util.io.BukkitObjectOutputStream;
 
 import java.io.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class LootBoxManager {
 
@@ -62,6 +64,10 @@ public class LootBoxManager {
             lootBoxConfig.set(path + ".display_name", lootBox.getDisplayName());
             lootBoxConfig.set(path + ".max_reward", lootBox.getMax_reward());
             lootBoxConfig.set(path + ".lore", lootBox.getLoreS());
+            lootBoxConfig.set(path + ".titlePreview", lootBox.getTitlePreview());
+            lootBoxConfig.set(path + ".announce_status", lootBox.isAnnounceStatus());
+            lootBoxConfig.set(path + ".announce", lootBox.getAnnouncementFinish());
+            lootBoxConfig.set(path + ".announce_start", lootBox.getAnnouncementStart());
 
 
 
@@ -105,7 +111,15 @@ public class LootBoxManager {
 
             int max_reward = section.getInt(key + ".max_reward");
 
+            String titlePreview = section.getString(key + ".titlePreview");
+
             List<String> lore = section.getStringList(key + ".lore");
+
+            List<String> announce = section.getStringList(key + ".announce");
+
+            boolean announceStatus = section.getBoolean(key + ".announce_status");
+
+            List<String> announceStart = section.getStringList(key + ".announce_start");
 
             List<ItemReward> rewards = new ArrayList<>();
             List<Map<?, ?>> rewardList = section.getMapList(key + ".rewards");
@@ -115,42 +129,66 @@ public class LootBoxManager {
                 double chance = (double) rewardMap.get("chance");
 
                 List<String> commands = (List<String>) rewardMap.get("commands");
-                ItemStack itemStack = (ItemStack) deserializeItemStack((String) rewardMap.get("item"));
+                ItemStack itemStack = deserializeItemStack((Map<String, Object>) rewardMap.get("item"));
 
                 boolean visible = (boolean) rewardMap.get("visible");
                 rewards.add(new ItemReward(rewardName, itemStack, chance, commands, visible, new ArrayList<>()));
             }
 
-            lootBoxes.add(new LootBox(name, rewards, displayName, max_reward, lore));
+            lootBoxes.add(new LootBox(name, rewards, displayName, max_reward, lore, titlePreview, announce, announceStart, announceStatus));
         }
     }
 
-    private String serializeItemStack(ItemStack item) {
+    private Map<String, Object> serializeItemStack(ItemStack item) {
         if (item == null) return null;
-        try {
-            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-            BukkitObjectOutputStream bukkitObjectOutputStream = new BukkitObjectOutputStream(byteArrayOutputStream);
-            bukkitObjectOutputStream.writeObject(item);
-            bukkitObjectOutputStream.close();
-            return Base64.getEncoder().encodeToString(byteArrayOutputStream.toByteArray());
-        } catch (IOException e) {
-            e.printStackTrace();
-            return null;
+
+        Map<String, Object> data = new HashMap<>(item.serialize()); // Convertir a HashMap para modificar
+
+        if (item.hasItemMeta()) {
+            ItemMeta meta = item.getItemMeta();
+            Map<String, Object> metaData = new HashMap<>(meta.serialize()); // Convertir a HashMap para modificar
+
+            if (meta.hasDisplayName()) {
+                metaData.put("display-name", meta.getDisplayName().replace("§", "&"));
+            }
+
+            if (meta.hasLore()) {
+                List<String> formattedLore = meta.getLore().stream()
+                        .map(lore -> lore.replace("§", "&"))
+                        .collect(Collectors.toList());
+                metaData.put("lore", formattedLore);
+            }
+
+            data.put("meta", metaData); // Reemplazar los metadatos en la estructura original
         }
+
+        return data;
     }
 
-    private ItemStack deserializeItemStack(String data) {
-        if (data == null || data.isEmpty()) return null;
-        try {
-            byte[] decodedBytes = Base64.getDecoder().decode(data);
-            ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(decodedBytes);
-            BukkitObjectInputStream bukkitObjectInputStream = new BukkitObjectInputStream(byteArrayInputStream);
-            ItemStack item = (ItemStack) bukkitObjectInputStream.readObject();
-            bukkitObjectInputStream.close();
-            return item;
-        } catch (IOException | ClassNotFoundException e) {
-            e.printStackTrace();
-            return null;
+
+    private ItemStack deserializeItemStack(Map<String, Object> data) {
+        if (data == null) return null;
+
+        ItemStack item = ItemStack.deserialize(data);
+
+        if (data.containsKey("meta")) {
+            Map<String, Object> metaData = (Map<String, Object>) data.get("meta");
+            ItemMeta meta = item.getItemMeta();
+
+            if (metaData.containsKey("display-name")) {
+                meta.setDisplayName(((String) metaData.get("display-name")).replace("&", "§"));
+            }
+
+            if (metaData.containsKey("lore")) {
+                List<String> formattedLore = ((List<String>) metaData.get("lore")).stream()
+                        .map(lore -> lore.replace("&", "§"))
+                        .collect(Collectors.toList());
+                meta.setLore(formattedLore);
+            }
+
+            item.setItemMeta(meta);
         }
+
+        return item;
     }
 }

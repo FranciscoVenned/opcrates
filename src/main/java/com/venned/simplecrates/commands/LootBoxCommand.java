@@ -4,12 +4,14 @@ import com.venned.simplecrates.build.ItemReward;
 import com.venned.simplecrates.build.LootBox;
 import com.venned.simplecrates.gui.edit.EditChances;
 import com.venned.simplecrates.manager.LootBoxManager;
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Sound;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -119,9 +121,40 @@ public class LootBoxCommand implements CommandExecutor {
                     break;
                 }
 
+                case "giveall" -> {
+                    if(args.length < 3) {
+                        player.sendMessage("§c§l(!) §cSpecify the name and amount");
+                        return true;
+                    }
+
+                    String name = args[1];
+                    LootBox lootBox = manager.getLootBoxes().stream()
+                            .filter(n->n.getName().equalsIgnoreCase(name)).findFirst().orElse(null);
+                    if(lootBox == null) {
+                        player.sendMessage("§c§l(!) §cThere is no such LootBox");
+                        return true;
+                    }
+
+                    int amount;
+
+                    try {
+                        amount = Integer.parseInt(args[2]);
+                    } catch (NumberFormatException e) {
+                        return true;
+                    }
+
+                    ItemStack loot = lootBox.getItem().clone();
+                    loot.setAmount(amount);
+
+                    for(Player players : Bukkit.getOnlinePlayers()){
+                        players.getInventory().addItem(loot);
+                    }
+
+                }
+
                 case "give" -> {
-                    if(args.length < 2) {
-                        player.sendMessage("§c§l(!) §cSpecify the name");
+                    if(args.length < 4) {
+                        player.sendMessage("§c§l(!) §cCorrect Usage  /lootbox give {name} {player} {amount}");
                         return true;
                     }
                     String name = args[1];
@@ -131,8 +164,25 @@ public class LootBoxCommand implements CommandExecutor {
                         player.sendMessage("§c§l(!) §cThere is no such LootBox");
                         return true;
                     }
-                    player.getInventory().addItem(lootBox.getItem());
-                    player.sendMessage("§c§l(!) §dLootBox " + name + " item was given to you");
+
+                    Player playerFind = Bukkit.getPlayer(args[2]);
+                    if(playerFind == null) {
+                        player.sendMessage("§c§l(!) §cPlayer not found");
+                        return true;
+                    }
+
+                    int amount;
+                    try {
+                        amount = Integer.parseInt(args[3]);
+                    } catch (NumberFormatException e) {
+                        player.sendMessage("§c§l(!) §cAmount no correct");
+                        return true;
+                    }
+
+                    ItemStack itemStack = lootBox.getItem().clone();
+                    itemStack.setAmount(amount);
+                    playerFind.getInventory().addItem(itemStack);
+                    playerFind.sendMessage("§c§l(!) §dLootBox " + name + " item was given to you");
                     break;
                 }
             }

@@ -3,7 +3,6 @@ package com.venned.simplecrates.manager;
 import com.venned.simplecrates.Main;
 import com.venned.simplecrates.build.Crate;
 import com.venned.simplecrates.build.CrateBlock;
-import com.venned.simplecrates.build.ItemReward;
 import org.bukkit.Location;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -68,6 +67,18 @@ public class CrateBlockManager {
             crateBlocks.add(new CrateBlock(location, crate));
         }
     }
+
+    public void removeCrateBlock(Location location) {
+
+        for(CrateBlock crateBlock : crateBlocks){
+            if(crateBlock.getLocation().equals(location)){
+                crateBlock.removeHologram();
+            }
+        }
+        crateBlocks.removeIf(c->c.getLocation().equals(location));
+        saveCrates();
+    }
+
 
     public void saveCrates() {
         cratesDataConfig.set("crates", null); // Reinicia la sección de crates
